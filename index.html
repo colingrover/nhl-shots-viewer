@@ -107,7 +107,7 @@
     if (TEAMS.includes("TOR")) teamBSelect.value = "TOR";
 
     function imgPath(team, mapObj) {
-      return `output/${mapObj.folder}/${team.toLowerCase()}_${mapObj.suffix}.png`;
+      return `${mapObj.folder}/${team.toLowerCase()}_${mapObj.suffix}.png`;
     }
 
     function mapOptionsHTML(selectedId) {
