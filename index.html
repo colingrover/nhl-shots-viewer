@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NHL Shot & Goal Contour Viewer (2026–27)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #0e1117;
+      color: #fafafa;
+    }
+    h1 { margin-top: 0; font-size: 1.6rem; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      background: #161b22;
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    label { font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+    select {
+      background: #0e1117;
+      color: #fafafa;
+      border: 1px solid #30363d;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+    .all-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #161b22;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .card img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>NHL Shot & Goal Contour Viewer (2026–27)</h1>
+
+  <div class="controls">
+    <label>View Mode:
+      <select id="modeSelect">
+        <option value="compare">Side-by-Side Comparison</option>
+        <option value="grid">All 6 Maps Grid</option>
+      </select>
+    </label>
+
+    <label id="compareTeamsWrap">
+      <input type="checkbox" id="compareTeamsCheck" />
+      Compare two teams
+    </label>
+
+    <label><span id="teamALabel">Team:</span>
+      <select id="teamASelect"></select>
+    </label>
+
+    <label id="teamBWrap" style="display:none;">Right Team:
+      <select id="teamBSelect"></select>
+    </label>
+  </div>
+
+  <div id="viewer"></div>
+
+  <script>
+    const TEAMS = ["ANA", "BOS", "BUF", "CAR", "CBJ", "CGY", "CHI", "COL", "DAL", "DET", "EDM", "FLA", "LAK", "MIN", "MTL", "NJD", "NSH", "NYI", "NYR", "OTT", "PHI", "PIT", "SEA", "SJS", "STL", "TBL", "TOR", "UTA", "VAN", "VGK", "WPG", "WSH"];
+    const MAP_TYPES = [{"id": "shots_all", "label": "All Shots", "folder": "shots_all", "suffix": "shots_all"}, {"id": "shots_rebound", "label": "Rebound Shots", "folder": "shots_rebound", "suffix": "shots_rebound"}, {"id": "shots_non_rebound", "label": "Non-Rebound Shots", "folder": "shots_non_rebound", "suffix": "shots_non_rebound"}, {"id": "goals_all", "label": "All Goals", "folder": "goals_all", "suffix": "goals_all"}, {"id": "goals_rebound", "label": "Rebound Goals", "folder": "goals_rebound", "suffix": "goals_rebound"}, {"id": "goals_non_rebound", "label": "Non-Rebound Goals", "folder": "goals_non_rebound", "suffix": "goals_non_rebound"}];
+
+    const modeSelect = document.getElementById("modeSelect");
+    const compareTeamsWrap = document.getElementById("compareTeamsWrap");
+    const compareTeamsCheck = document.getElementById("compareTeamsCheck");
+    const teamALabel = document.getElementById("teamALabel");
+    const teamASelect = document.getElementById("teamASelect");
+    const teamBWrap = document.getElementById("teamBWrap");
+    const teamBSelect = document.getElementById("teamBSelect");
+    const viewer = document.getElementById("viewer");
+
+    let leftMapId = "shots_all";
+    let rightMapId = "goals_all";
+
+    TEAMS.forEach(t => {
+      teamASelect.add(new Option(t, t));
+      teamBSelect.add(new Option(t, t));
+    });
+    if (TEAMS.includes("OTT")) teamASelect.value = "OTT";
+    if (TEAMS.includes("TOR")) teamBSelect.value = "TOR";
+
+    function imgPath(team, mapObj) {
+      return `output/${mapObj.folder}/${team.toLowerCase()}_${mapObj.suffix}.png`;
+    }
+
+    function mapOptionsHTML(selectedId) {
+      return MAP_TYPES.map(m =>
+        `<option value="${m.id}" ${m.id === selectedId ? "selected" : ""}>${m.label}</option>`
+      ).join("");
+    }
+
+    function render() {
+      const mode = modeSelect.value;
+      const twoTeams = compareTeamsCheck.checked;
+      const teamA = teamASelect.value;
+      const teamB = twoTeams ? teamBSelect.value : teamA;
+
+      compareTeamsWrap.style.display = mode === "compare" ? "flex" : "none";
+      teamBWrap.style.display = (mode === "compare" && twoTeams) ? "flex" : "none";
+      teamALabel.textContent = (mode === "compare" && twoTeams) ? "Left Team:" : "Team:";
+
+      if (mode === "compare") {
+        const leftMap = MAP_TYPES.find(m => m.id === leftMapId);
+        const rightMap = MAP_TYPES.find(m => m.id === rightMapId);
+
+        viewer.className = "compare-grid";
+        viewer.innerHTML = `
+          <div class="card">
+            <select id="leftMapSelect">${mapOptionsHTML(leftMapId)}</select>
+            <img src="${imgPath(teamA, leftMap)}" alt="${teamA} ${leftMap.label}" />
+          </div>
+          <div class="card">
+            <select id="rightMapSelect">${mapOptionsHTML(rightMapId)}</select>
+            <img src="${imgPath(teamB, rightMap)}" alt="${teamB} ${rightMap.label}" />
+          </div>
+        `;
+
+        document.getElementById("leftMapSelect").addEventListener("change", e => {
+          leftMapId = e.target.value;
+          render();
+        });
+        document.getElementById("rightMapSelect").addEventListener("change", e => {
+          rightMapId = e.target.value;
+          render();
+        });
+      } else {
+        viewer.className = "all-grid";
+        viewer.innerHTML = MAP_TYPES.map(m => `
+          <div class="card">
+            <div><strong>${m.label}</strong></div>
+            <img src="${imgPath(teamA, m)}" alt="${teamA} ${m.label}" />
+          </div>
+        `).join("");
+      }
+    }
+
+    [modeSelect, compareTeamsCheck, teamASelect, teamBSelect].forEach(el =>
+      el.addEventListener("change", render)
+    );
+    render();
+  </script>
+</body>
+</html>
